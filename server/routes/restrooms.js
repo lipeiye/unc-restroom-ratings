@@ -1,23 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const Restroom = require('../models/Restroom');
+const { isDBConnected } = require('../config/db');
+const memoryStore = require('../data/memoryStore');
 
-// GET all restrooms
+let Restroom;
+try { Restroom = require('../models/Restroom'); } catch (e) { Restroom = null; }
+const useMemory = () => !isDBConnected() || !Restroom;
+
+// GET all restrooms (sorted: redAlert first, then rating)
 router.get('/', async (req, res) => {
   try {
-    const { building, minRating, search } = req.query;
-    let query = {};
-
-    if (building) query.building = building;
-    if (minRating) query.averageRating = { $gte: parseFloat(minRating) };
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { building: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const restrooms = await Restroom.find(query).sort({ averageRating: -1 });
+    if (useMemory()) return res.json(memoryStore.getAllRestrooms());
+    const restrooms = await Restroom.find().sort({ redAlert: -1, averageRating: -1 });
     res.json(restrooms);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -27,17 +21,23 @@ router.get('/', async (req, res) => {
 // GET single restroom
 router.get('/:id', async (req, res) => {
   try {
+    if (useMemory()) {
+      const restroom = memoryStore.getRestroomById(req.params.id);
+      if (!restroom) return res.status(404).json({ message: 'Not found' });
+      return res.json(restroom);
+    }
     const restroom = await Restroom.findById(req.params.id);
-    if (!restroom) return res.status(404).json({ message: 'Restroom not found' });
+    if (!restroom) return res.status(404).json({ message: 'Not found' });
     res.json(restroom);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// GET all unique buildings
-router.get('/buildings/list', async (req, res) => {
+// GET buildings list
+router.get('/meta/buildings', async (req, res) => {
   try {
+    if (useMemory()) return res.json(memoryStore.getBuildings());
     const buildings = await Restroom.distinct('building');
     res.json(buildings.sort());
   } catch (error) {
@@ -45,13 +45,10 @@ router.get('/buildings/list', async (req, res) => {
   }
 });
 
-// POST seed data (for initial setup)
-router.post('/seed', async (req, res) => {
+// GET last reset time
+router.get('/meta/last-reset', async (req, res) => {
   try {
-    const seedData = req.body;
-    await Restroom.deleteMany({});
-    const restrooms = await Restroom.insertMany(seedData);
-    res.json({ message: `Seeded ${restrooms.length} restrooms` });
+    res.json({ lastReset: memoryStore.getLastResetTime() });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

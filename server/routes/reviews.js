@@ -1,60 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const Review = require('../models/Review');
-const Restroom = require('../models/Restroom');
+const { isDBConnected } = require('../config/db');
+const memoryStore = require('../data/memoryStore');
 
-// GET reviews for a restroom
-router.get('/:restroomId', async (req, res) => {
+let Restroom;
+try { Restroom = require('../models/Restroom'); } catch (e) { Restroom = null; }
+const useMemory = () => !isDBConnected() || !Restroom;
+
+// POST rating only (1-5 stars)
+router.post('/rate/:restroomId', async (req, res) => {
   try {
-    const reviews = await Review.find({ restroom: req.params.restroomId })
-      .sort({ createdAt: -1 })
-      .limit(50);
-    res.json(reviews);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+    const { rating } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be 1-5' });
+    }
 
-// POST a new review
-router.post('/:restroomId', async (req, res) => {
-  try {
-    const { authorName, rating, content, tags } = req.body;
-    
-    const review = new Review({
-      restroom: req.params.restroomId,
-      authorName: authorName || 'Anonymous',
-      rating,
-      content,
-      tags: tags || []
-    });
+    if (useMemory()) {
+      const result = memoryStore.submitRating(req.params.restroomId, rating);
+      if (!result) return res.status(404).json({ message: 'Restroom not found' });
+      const restroom = memoryStore.getRestroomById(req.params.restroomId);
+      req.io.emit('ratingUpdate', { restroom });
+      return res.status(201).json({ rating: result, restroom });
+    }
 
-    await review.save();
+    // DB mode fallback
+    const restroom = await Restroom.findById(req.params.restroomId);
+    if (!restroom) return res.status(404).json({ message: 'Not found' });
 
-    // Emit real-time update
-    const updatedRestroom = await Restroom.findById(req.params.restroomId);
-    req.io.emit('newReview', { 
-      restroomId: req.params.restroomId,
-      review,
-      restroomUpdate: {
-        averageRating: updatedRestroom.averageRating,
-        totalReviews: updatedRestroom.totalReviews
-      }
-    });
+    const oldTotal = restroom.averageRating * restroom.totalReviews;
+    restroom.totalReviews += 1;
+    restroom.averageRating = Math.round(((oldTotal + rating) / restroom.totalReviews) * 10) / 10;
+    if (rating <= 2) {
+      restroom.redAlertCount = (restroom.redAlertCount || 0) + 1;
+      if (restroom.redAlertCount >= 2) restroom.redAlert = true;
+    }
+    await restroom.save();
 
-    res.status(201).json(review);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// DELETE a review
-router.delete('/:reviewId', async (req, res) => {
-  try {
-    const review = await Review.findById(req.params.reviewId);
-    if (!review) return res.status(404).json({ message: 'Review not found' });
-    
-    await review.deleteOne();
-    res.json({ message: 'Review deleted' });
+    req.io.emit('ratingUpdate', { restroom });
+    res.status(201).json({ restroom });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

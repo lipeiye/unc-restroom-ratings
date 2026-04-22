@@ -1,136 +1,70 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
-import { UNC_RESTROOMS, BUILDINGS } from '../data/uncRestrooms'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 export function useRestrooms() {
   const [restrooms, setRestrooms] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [socket, setSocket] = useState(null)
-
-  // Seed local data if DB is not available
-  const seedLocalData = useCallback(async () => {
-    try {
-      await axios.post(`${API_URL}/api/restrooms/seed`, UNC_RESTROOMS)
-    } catch (err) {
-      console.log('Using local data (DB may not be connected)')
-    }
-  }, [])
+  const [lastReset, setLastReset] = useState(null)
+  const [countdown, setCountdown] = useState('')
 
   const fetchRestrooms = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`${API_URL}/api/restrooms`)
-      setRestrooms(response.data)
-      setError(null)
+      const [restRes, resetRes] = await Promise.all([
+        axios.get(`${API_URL}/api/restrooms`),
+        axios.get(`${API_URL}/api/restrooms/meta/last-reset`)
+      ])
+      setRestrooms(restRes.data)
+      setLastReset(resetRes.data.lastReset)
     } catch (err) {
-      // Fallback to local data
-      setRestrooms(UNC_RESTROOMS.map((r, i) => ({ ...r, _id: `local-${i}` })))
-      setError(null)
+      console.error('Fetch error:', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
+  const submitRating = useCallback(async (restroomId, rating) => {
+    const res = await axios.post(`${API_URL}/api/reviews/rate/${restroomId}`, { rating })
+    return res.data
+  }, [])
+
+  // Countdown to 8 PM
   useEffect(() => {
-    seedLocalData().then(() => fetchRestrooms())
+    const interval = setInterval(() => {
+      const now = new Date()
+      const reset = new Date()
+      reset.setHours(20, 0, 0, 0)
+      if (reset <= now) reset.setDate(reset.getDate() + 1)
 
-    // Setup Socket.io for real-time updates
-    const newSocket = io(API_URL)
-    setSocket(newSocket)
+      const diff = reset - now
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdown(`${h}h ${m}m ${s}s`)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
-    newSocket.on('newReview', (data) => {
-      setRestrooms(prev => prev.map(r => {
-        if (r._id === data.restroomId) {
-          return {
-            ...r,
-            averageRating: data.restroomUpdate.averageRating,
-            totalReviews: data.restroomUpdate.totalReviews
-          }
-        }
-        return r
+  useEffect(() => {
+    fetchRestrooms()
+    const socket = io(API_URL)
+
+    socket.on('ratingUpdate', ({ restroom }) => {
+      setRestrooms(prev => prev.map(r => r._id === restroom._id ? restroom : r).sort((a, b) => {
+        if (a.redAlert !== b.redAlert) return b.redAlert - a.redAlert
+        return b.averageRating - a.averageRating
       }))
     })
 
-    return () => newSocket.close()
-  }, [fetchRestrooms, seedLocalData])
+    socket.on('dataReset', () => {
+      fetchRestrooms()
+    })
 
-  const filterRestrooms = useCallback((filters) => {
-    let filtered = [...restrooms]
-    
-    if (filters.building) {
-      filtered = filtered.filter(r => r.building === filters.building)
-    }
-    if (filters.minRating) {
-      filtered = filtered.filter(r => (r.averageRating || 0) >= filters.minRating)
-    }
-    if (filters.search) {
-      const search = filters.search.toLowerCase()
-      filtered = filtered.filter(r => 
-        r.name.toLowerCase().includes(search) ||
-        r.building.toLowerCase().includes(search)
-      )
-    }
-    if (filters.tags && filters.tags.length > 0) {
-      filtered = filtered.filter(r => 
-        filters.tags.some(tag => r.tags?.includes(tag))
-      )
-    }
-    
-    return filtered
-  }, [restrooms])
+    return () => socket.close()
+  }, [fetchRestrooms])
 
-  return {
-    restrooms,
-    loading,
-    error,
-    buildings: BUILDINGS,
-    fetchRestrooms,
-    filterRestrooms,
-    socket
-  }
-}
-
-export function useRestroomDetail(restroomId) {
-  const [restroom, setRestroom] = useState(null)
-  const [reviews, setReviews] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const fetchRestroom = useCallback(async () => {
-    try {
-      setLoading(true)
-      const [restroomRes, reviewsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/restrooms/${restroomId}`),
-        axios.get(`${API_URL}/api/reviews/${restroomId}`)
-      ])
-      setRestroom(restroomRes.data)
-      setReviews(reviewsRes.data)
-    } catch (err) {
-      // Fallback to local data
-      const local = UNC_RESTROOMS[parseInt(restroomId.replace('local-', ''))]
-      if (local) {
-        setRestroom({ ...local, _id: restroomId })
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [restroomId])
-
-  const submitReview = useCallback(async (reviewData) => {
-    const response = await axios.post(
-      `${API_URL}/api/reviews/${restroomId}`,
-      reviewData
-    )
-    setReviews(prev => [response.data, ...prev])
-    return response.data
-  }, [restroomId])
-
-  useEffect(() => {
-    fetchRestroom()
-  }, [fetchRestroom])
-
-  return { restroom, reviews, loading, fetchRestroom, submitReview }
+  return { restrooms, loading, lastReset, countdown, fetchRestrooms, submitRating }
 }
