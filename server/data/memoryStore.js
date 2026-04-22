@@ -7,11 +7,18 @@ let lastResetTime = null;
 function initRestrooms() {
   restrooms = UNC_RESTROOMS.map((r) => ({
     _id: `r-${nextId++}`,
-    ...r,
+    name: r.name,
+    building: r.building,
+    floor: r.floor,
+    description: r.description,
+    location: r.location,
     averageRating: 0,
     totalReviews: 0,
+    pooperScore: 0,        // 适合拉屎程度 0-5
+    cleanliness: 0,        // 干净程度 0-5
     redAlert: false,
     redAlertCount: 0,
+    noFlushCount: 0,       // 没冲厕所举报次数
     lastUpdated: null,
     createdAt: new Date().toISOString()
   }));
@@ -21,7 +28,6 @@ function initRestrooms() {
 initRestrooms();
 
 function getAllRestrooms() {
-  // Sort: redAlert first, then by averageRating desc
   return [...restrooms].sort((a, b) => {
     if (a.redAlert !== b.redAlert) return b.redAlert - a.redAlert;
     return b.averageRating - a.averageRating;
@@ -40,24 +46,37 @@ function submitRating(restroomId, rating) {
   const restroom = getRestroomById(restroomId);
   if (!restroom) return null;
 
-  // Update average
   const oldTotal = restroom.averageRating * restroom.totalReviews;
   restroom.totalReviews += 1;
   restroom.averageRating = Math.round(((oldTotal + rating) / restroom.totalReviews) * 10) / 10;
-  restroom.lastUpdated = new Date().toISOString();
 
-  // Red alert logic: rating <= 2 triggers red alert
+  // Update derived scores
+  restroom.pooperScore = Math.min(5, Math.round((restroom.averageRating * 0.9) * 10) / 10);
+  restroom.cleanliness = Math.min(5, Math.round((restroom.averageRating * 0.95) * 10) / 10);
+
+  // Low rating triggers red alert
   if (rating <= 2) {
     restroom.redAlertCount += 1;
-    if (restroom.redAlertCount >= 2) {
-      restroom.redAlert = true;
-    }
+    if (restroom.redAlertCount >= 2) restroom.redAlert = true;
   }
 
+  restroom.lastUpdated = new Date().toISOString();
+  return { rating, restroom };
+}
+
+function triggerNoFlushAlert(restroomId) {
+  const restroom = getRestroomById(restroomId);
+  if (!restroom) return null;
+
+  restroom.noFlushCount += 1;
+  restroom.redAlert = true;
+  restroom.redAlertCount = Math.max(restroom.redAlertCount, 2);
+  restroom.lastUpdated = new Date().toISOString();
+
   return {
-    _id: `rating-${Date.now()}`,
+    _id: `alert-${Date.now()}`,
     restroom: restroomId,
-    rating,
+    type: 'no-flush',
     createdAt: new Date().toISOString()
   };
 }
@@ -76,6 +95,7 @@ module.exports = {
   getRestroomById,
   getBuildings,
   submitRating,
+  triggerNoFlushAlert,
   resetAllData,
   getLastResetTime
 };

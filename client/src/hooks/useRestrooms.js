@@ -31,6 +31,11 @@ export function useRestrooms() {
     return res.data
   }, [])
 
+  const submitNoFlush = useCallback(async (restroomId) => {
+    const res = await axios.post(`${API_URL}/api/reviews/noflush/${restroomId}`)
+    return res.data
+  }, [])
+
   // Countdown to 8 PM
   useEffect(() => {
     const interval = setInterval(() => {
@@ -38,7 +43,6 @@ export function useRestrooms() {
       const reset = new Date()
       reset.setHours(20, 0, 0, 0)
       if (reset <= now) reset.setDate(reset.getDate() + 1)
-
       const diff = reset - now
       const h = Math.floor(diff / 3600000)
       const m = Math.floor((diff % 3600000) / 60000)
@@ -59,12 +63,9 @@ export function useRestrooms() {
       }))
     })
 
-    socket.on('dataReset', () => {
-      fetchRestrooms()
-    })
-
+    socket.on('dataReset', () => fetchRestrooms())
     return () => socket.close()
   }, [fetchRestrooms])
 
-  return { restrooms, loading, lastReset, countdown, fetchRestrooms, submitRating }
+  return { restrooms, loading, lastReset, countdown, fetchRestrooms, submitRating, submitNoFlush }
 }
