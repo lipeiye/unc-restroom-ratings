@@ -96,6 +96,8 @@ unc-restroom-ratings/
 | `ratingUpdate` | Server → Client | `{ restroom }` — broadcast when rating/alert changes |
 | `dataReset` | Server → Client | `{ resetAt }` — broadcast at 6:00 AM daily |
 
+> **Dev proxy note:** Vite dev server proxies both `/api` and `/socket.io` to `localhost:5001`. The frontend uses relative paths (`/api/...`) so it works out of the box without `VITE_API_URL`.
+
 ---
 
 ## Data Model (In-Memory)
@@ -172,7 +174,7 @@ If MongoDB is unavailable (no `MONGODB_URI` set or connection fails), the backen
 ## Development Setup
 
 ```bash
-# 1. Start backend
+# 1. Start backend (required — frontend will be empty without it)
 cd server
 npm install
 export PATH="$HOME/.nvm/versions/node/v20.20.2/bin:$PATH"
@@ -182,10 +184,12 @@ node server.js        # runs on :5001
 cd client
 npm install
 export PATH="$HOME/.nvm/versions/node/v20.20.2/bin:$PATH"
-npm run dev           # runs on :5173, proxies /api to :5001
+npm run dev           # runs on :5173, proxies /api and /socket.io to :5001
 ```
 
 No MongoDB required for local dev — in-memory mode activates automatically.
+
+> **Important:** The frontend needs the backend running to display restroom data. If you only see the header/search bar but no cards, the backend is not started.
 
 ---
 
@@ -197,6 +201,9 @@ PORT=5001
 MONGODB_URI=mongodb+srv://...   # optional; omit for memory mode
 CLIENT_URL=http://localhost:5173
 ```
+
+**Client-side (optional):**
+`client/.env` is not required for local dev. The frontend uses relative API paths (`/api/...`) by default. Only set `VITE_API_URL` if you need to point the frontend at a different backend (e.g., production API).
 
 ---
 
@@ -218,6 +225,8 @@ CLIENT_URL=http://localhost:5173
 | Score formulas | `server/data/memoryStore.js` — `pooperScore` / `cleanliness` lines |
 | Card UI layout | `client/src/pages/HomePage.jsx` — `RestroomRow` component |
 | Rating UI | `client/src/pages/RestroomDetail.jsx` — star buttons section |
+| API base URL / proxy rules | `client/vite.config.js` — `server.proxy` section |
+| Data fetching hook | `client/src/hooks/useRestrooms.js` — REST + Socket.io client |
 | Add more API endpoints | `server/routes/` + register in `server.js` |
 
 ---
