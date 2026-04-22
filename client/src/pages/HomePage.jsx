@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, AlertTriangle, Clock, Droplets, Sparkles } from 'lucide-react'
+import { Search, AlertTriangle, Clock, Droplets, Sparkles, Plus, X } from 'lucide-react'
 import { useRestrooms } from '../hooks/useRestrooms'
 
 function HomePage() {
-  const { restrooms, loading, countdown } = useRestrooms()
+  const { restrooms, loading, countdown, createRestroom } = useRestrooms()
   const [search, setSearch] = useState('')
   const [filterBuilding, setFilterBuilding] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newRestroom, setNewRestroom] = useState({ name: '', building: '', floor: '', description: '' })
 
   const buildings = [...new Set(restrooms.map(r => r.building))].sort()
 
@@ -18,6 +20,14 @@ function HomePage() {
 
   const redAlerts = filtered.filter(r => r.redAlert)
   const normal = filtered.filter(r => !r.redAlert)
+
+  const handleAddRestroom = async (e) => {
+    e.preventDefault()
+    if (!newRestroom.building || !newRestroom.floor) return
+    await createRestroom(newRestroom)
+    setNewRestroom({ name: '', building: '', floor: '', description: '' })
+    setShowAddForm(false)
+  }
 
   if (loading) {
     return (
@@ -43,12 +53,12 @@ function HomePage() {
         </div>
 
         {/* Search & Filter */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 mb-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search building or floor..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none text-sm"
@@ -63,14 +73,68 @@ function HomePage() {
             {buildings.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
+
+        {/* Add Restroom Button */}
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center space-x-2 text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+        >
+          {showAddForm ? <X size={16} /> : <Plus size={16} />}
+          <span>{showAddForm ? 'Cancel' : 'Add a Restroom'}</span>
+        </button>
       </div>
+
+      {/* Add Restroom Form */}
+      {showAddForm && (
+        <form onSubmit={handleAddRestroom} className="bg-white rounded-xl border border-gray-100 p-5 mb-6 space-y-3">
+          <h3 className="font-bold text-gray-900">Add New Restroom</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="Building name *"
+              value={newRestroom.building}
+              onChange={(e) => setNewRestroom(p => ({ ...p, building: e.target.value }))}
+              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Floor (e.g. 1F, B1) *"
+              value={newRestroom.floor}
+              onChange={(e) => setNewRestroom(p => ({ ...p, floor: e.target.value }))}
+              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+              required
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Restroom name (optional)"
+            value={newRestroom.name}
+            onChange={(e) => setNewRestroom(p => ({ ...p, name: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            value={newRestroom.description}
+            onChange={(e) => setNewRestroom(p => ({ ...p, description: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+          />
+          <button
+            type="submit"
+            className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg transition-colors text-sm"
+          >
+            Add Restroom
+          </button>
+        </form>
+      )}
 
       {/* Red Alert Section */}
       {redAlerts.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center space-x-2 mb-3">
             <AlertTriangle className="text-red-500" size={18} />
-            <h2 className="font-bold text-red-600">🚨 RED ALERT ({redAlerts.length})</h2>
+            <h2 className="font-bold text-red-600">RED ALERT ({redAlerts.length})</h2>
           </div>
           <div className="space-y-2">
             {redAlerts.map(r => <RestroomRow key={r._id} restroom={r} />)}
@@ -118,19 +182,20 @@ function RestroomRow({ restroom }) {
           </div>
           <p className="text-xs text-gray-400">{restroom.building} · {restroom.floor}</p>
 
-          {/* Mini scores */}
           <div className="flex items-center space-x-3 mt-2">
             <div className="flex items-center space-x-1">
               <Droplets size={12} className={scoreColor(restroom.pooperScore)} />
               <span className={`text-xs font-bold ${scoreColor(restroom.pooperScore)}`}>
                 {restroom.pooperScore > 0 ? restroom.pooperScore.toFixed(1) : '—'}
               </span>
+              <span className="text-[10px] text-gray-300">Poopability</span>
             </div>
             <div className="flex items-center space-x-1">
               <Sparkles size={12} className={scoreColor(restroom.cleanliness)} />
               <span className={`text-xs font-bold ${scoreColor(restroom.cleanliness)}`}>
                 {restroom.cleanliness > 0 ? restroom.cleanliness.toFixed(1) : '—'}
               </span>
+              <span className="text-[10px] text-gray-300">Clean</span>
             </div>
             {restroom.noFlushCount > 0 && (
               <span className="text-xs text-red-500 font-bold">🚫 {restroom.noFlushCount}</span>

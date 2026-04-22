@@ -4,7 +4,7 @@ import { AlertTriangle, Clock } from 'lucide-react'
 function Navbar() {
   return (
     <nav className="bg-gray-900 shadow-lg">
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-2xl mx-auto px-4">
         <div className="flex items-center justify-between h-14">
           <Link to="/" className="flex items-center space-x-2">
             <span className="text-2xl">🚻</span>

@@ -14,11 +14,11 @@ function initRestrooms() {
     location: r.location,
     averageRating: 0,
     totalReviews: 0,
-    pooperScore: 0,        // 适合拉屎程度 0-5
-    cleanliness: 0,        // 干净程度 0-5
+    pooperScore: 0,
+    cleanliness: 0,
     redAlert: false,
     redAlertCount: 0,
-    noFlushCount: 0,       // 没冲厕所举报次数
+    noFlushCount: 0,
     lastUpdated: null,
     createdAt: new Date().toISOString()
   }));
@@ -42,6 +42,28 @@ function getBuildings() {
   return [...new Set(restrooms.map(r => r.building))].sort();
 }
 
+function createRestroom({ name, building, floor, description }) {
+  const restroom = {
+    _id: `r-${nextId++}`,
+    name: name || `Floor ${floor} Restroom`,
+    building,
+    floor,
+    description: description || `Restroom at ${building}, Floor ${floor}.`,
+    location: { lat: 35.9095 + (Math.random() - 0.5) * 0.01, lng: -79.0475 + (Math.random() - 0.5) * 0.01 },
+    averageRating: 0,
+    totalReviews: 0,
+    pooperScore: 0,
+    cleanliness: 0,
+    redAlert: false,
+    redAlertCount: 0,
+    noFlushCount: 0,
+    lastUpdated: null,
+    createdAt: new Date().toISOString()
+  };
+  restrooms.push(restroom);
+  return restroom;
+}
+
 function submitRating(restroomId, rating) {
   const restroom = getRestroomById(restroomId);
   if (!restroom) return null;
@@ -50,11 +72,9 @@ function submitRating(restroomId, rating) {
   restroom.totalReviews += 1;
   restroom.averageRating = Math.round(((oldTotal + rating) / restroom.totalReviews) * 10) / 10;
 
-  // Update derived scores
   restroom.pooperScore = Math.min(5, Math.round((restroom.averageRating * 0.9) * 10) / 10);
   restroom.cleanliness = Math.min(5, Math.round((restroom.averageRating * 0.95) * 10) / 10);
 
-  // Low rating triggers red alert
   if (rating <= 2) {
     restroom.redAlertCount += 1;
     if (restroom.redAlertCount >= 2) restroom.redAlert = true;
@@ -94,6 +114,7 @@ module.exports = {
   getAllRestrooms,
   getRestroomById,
   getBuildings,
+  createRestroom,
   submitRating,
   triggerNoFlushAlert,
   resetAllData,

@@ -18,6 +18,27 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST create new restroom
+router.post('/', async (req, res) => {
+  try {
+    const { name, building, floor, description } = req.body;
+    if (!building || !floor) {
+      return res.status(400).json({ message: 'Building and floor are required' });
+    }
+
+    if (useMemory()) {
+      const restroom = memoryStore.createRestroom({ name, building, floor, description });
+      return res.status(201).json(restroom);
+    }
+
+    const restroom = new Restroom({ name, building, floor, description });
+    await restroom.save();
+    res.status(201).json(restroom);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET single restroom
 router.get('/:id', async (req, res) => {
   try {

@@ -20,14 +20,14 @@ function RestroomDetail() {
     try {
       await submitRating(restroom._id, rating)
     } catch (err) {
-      alert('Failed to submit')
+      alert('Failed to submit rating')
     }
   }
 
   const handleNoFlush = async () => {
     try {
       await submitNoFlush(restroom._id)
-      alert('🚨 Red Alert triggered! Someone did not flush.')
+      alert('Red Alert triggered!')
     } catch (err) {
       alert('Failed to trigger alert')
     }
@@ -41,7 +41,6 @@ function RestroomDetail() {
   }
 
   const getScoreBar = (score) => {
-    const pct = (score / 5) * 100
     if (score >= 4) return 'bg-green-500'
     if (score >= 3) return 'bg-yellow-500'
     if (score >= 2) return 'bg-orange-500'
@@ -80,8 +79,8 @@ function RestroomDetail() {
             <AlertTriangle size={18} />
             <span>
               {restroom.noFlushCount > 0
-                ? `🚫 NO FLUSH DETECTED! (${restroom.noFlushCount} reports)`
-                : '⚠️ LOW RATING ALERT! This restroom is flagged.'}
+                ? `NO FLUSH DETECTED! (${restroom.noFlushCount} reports)`
+                : 'LOW RATING ALERT! This restroom is flagged.'}
             </span>
           </div>
         )}
@@ -90,7 +89,7 @@ function RestroomDetail() {
       {/* Scores */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <div className="text-sm text-gray-500 mb-1">适合拉屎程度</div>
+          <div className="text-sm text-gray-500 mb-1">Poopability</div>
           <div className={`text-3xl font-black ${getScoreColor(restroom.pooperScore)}`}>
             {restroom.pooperScore > 0 ? restroom.pooperScore.toFixed(1) : '—'} <span className="text-lg text-gray-300">/5</span>
           </div>
@@ -99,7 +98,7 @@ function RestroomDetail() {
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-          <div className="text-sm text-gray-500 mb-1">干净程度</div>
+          <div className="text-sm text-gray-500 mb-1">Cleanliness</div>
           <div className={`text-3xl font-black ${getScoreColor(restroom.cleanliness)}`}>
             {restroom.cleanliness > 0 ? restroom.cleanliness.toFixed(1) : '—'} <span className="text-lg text-gray-300">/5</span>
           </div>
@@ -141,7 +140,6 @@ function RestroomDetail() {
           </div>
         </div>
 
-        {/* Rating Labels */}
         <div className="flex justify-between text-xs text-gray-400 px-4">
           <span>Terrible</span>
           <span>Okay</span>
@@ -155,7 +153,7 @@ function RestroomDetail() {
         className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-2xl transition-all hover:shadow-lg active:scale-[0.98] flex items-center justify-center space-x-3 mb-6"
       >
         <span className="text-2xl">🚫🚽</span>
-        <span className="text-lg">有人没冲厕所！一键红色报警</span>
+        <span className="text-lg">Someone Didn't Flush! Red Alert</span>
         <AlertTriangle size={20} />
       </button>
 

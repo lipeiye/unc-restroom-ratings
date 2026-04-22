@@ -36,6 +36,15 @@ export function useRestrooms() {
     return res.data
   }, [])
 
+  const createRestroom = useCallback(async (data) => {
+    const res = await axios.post(`${API_URL}/api/restrooms`, data)
+    setRestrooms(prev => [...prev, res.data].sort((a, b) => {
+      if (a.redAlert !== b.redAlert) return b.redAlert - a.redAlert
+      return b.averageRating - a.averageRating
+    }))
+    return res.data
+  }, [])
+
   // Countdown to 8 PM
   useEffect(() => {
     const interval = setInterval(() => {
@@ -67,5 +76,5 @@ export function useRestrooms() {
     return () => socket.close()
   }, [fetchRestrooms])
 
-  return { restrooms, loading, lastReset, countdown, fetchRestrooms, submitRating, submitNoFlush }
+  return { restrooms, loading, lastReset, countdown, fetchRestrooms, submitRating, submitNoFlush, createRestroom }
 }
