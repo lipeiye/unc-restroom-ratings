@@ -6,7 +6,9 @@ const cron = require('node-cron');
 require('dotenv').config();
 
 const connectDB = require('./config/db');
+const { isDBConnected, isSQLiteConnected } = require('./config/db');
 const memoryStore = require('./data/memoryStore');
+const sqliteStore = require('./data/sqliteStore');
 const restroomRoutes = require('./routes/restrooms');
 const reviewRoutes = require('./routes/reviews');
 
@@ -16,7 +18,13 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-connectDB();
+// Initialize database connection (MongoDB -> SQLite -> memory)
+connectDB().then(async () => {
+  if (isSQLiteConnected()) {
+    await sqliteStore.seedIfEmpty();
+  }
+  scheduleReset();
+});
 
 app.use(cors());
 app.use(express.json());
@@ -41,20 +49,25 @@ function scheduleReset() {
 
   setTimeout(() => {
     console.log('🔄 Running daily reset...');
-    memoryStore.resetAllData();
-    io.emit('dataReset', { resetAt: new Date().toISOString() });
+    runReset();
     console.log('✅ Daily reset complete');
     scheduleReset();
   }, msUntilReset);
 }
 
-scheduleReset();
+async function runReset() {
+  if (isSQLiteConnected()) {
+    await sqliteStore.resetAllData();
+  } else {
+    memoryStore.resetAllData();
+  }
+  io.emit('dataReset', { resetAt: new Date().toISOString() });
+}
 
 // Also support cron for robustness
 cron.schedule('0 6 * * *', () => {
   console.log('🔄 Cron triggered daily reset');
-  memoryStore.resetAllData();
-  io.emit('dataReset', { resetAt: new Date().toISOString() });
+  runReset();
 });
 
 io.on('connection', (socket) => {

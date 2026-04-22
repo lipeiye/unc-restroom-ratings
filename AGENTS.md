@@ -23,7 +23,7 @@ Users can also submit new restrooms (any building + floor).
 |-------|-----------|
 | Frontend | React 18 + Vite + Tailwind CSS + Socket.io-client |
 | Backend | Node.js + Express + Socket.io |
-| Database | MongoDB Atlas (with in-memory fallback) |
+| Database | MongoDB Atlas (primary) + SQLite (local fallback) + in-memory (last resort) |
 | Maps | ~~Leaflet~~ (removed — list-only UI now) |
 | Deployment | Docker + AWS Elastic Beanstalk (ready) |
 
@@ -54,7 +54,12 @@ unc-restroom-ratings/
 ├── server/                     # Express backend
 │   ├── data/
 │   │   ├── uncRestrooms.js     # Shared seed data
-│   │   └── memoryStore.js      # In-memory DB fallback + CRUD
+│   │   ├── memoryStore.js      # Pure in-memory fallback (last resort)
+│   │   ├── sqliteStore.js      # SQLite CRUD wrapper
+│   │   └── database.sqlite     # Local SQLite file (auto-created)
+│   ├── config/
+│   │   ├── db.js               # MongoDB connection + SQLite fallback
+│   │   └── sqlite.js           # SQLite connection & schema init
 │   ├── routes/
 │   │   ├── restrooms.js        # GET / POST restrooms
 │   │   └── reviews.js          # POST rating / no-flush alert
@@ -143,23 +148,37 @@ poooperScore    = min(5, round(averageRating * 0.9 * 10) / 10)
 cleanliness     = min(5, round(averageRating * 0.95 * 10) / 10)
 ```
 
-### 4. In-Memory Fallback
-If MongoDB is unavailable (no `MONGODB_URI` set or connection fails), the backend silently falls back to `memoryStore.js`. All CRUD operations work identically. This is the default dev mode.
+### 4. Database Fallback Chain
+The backend tries databases in this order:
+
+1. **MongoDB Atlas** — used if `MONGODB_URI` is set and connection succeeds.
+2. **SQLite** — local file (`server/data/database.sqlite`) used when MongoDB is unavailable. Data persists across restarts. This is the default dev mode.
+3. **In-memory** — pure RAM fallback if both above fail. Data is lost on restart.
+
+All three layers expose identical CRUD behavior via `restrooms.js` / `reviews.js` routes.
 
 ---
 
 ## Frontend Pages
 
 ### HomePage (`/`)
-- **Layout:** Single-column list, max-width 672px (`max-w-2xl`), mobile-first.
-- **Red Alert section:** Appears only if `redAlert === true`. Cards have red bg/border.
-- **Normal section:** All non-alert restrooms, sorted by `averageRating` desc.
-- **Add Restroom form:** Toggleable form at top. Fields: Building name (req), Floor (req), Name (opt), Description (opt).
-- **Card design:**
-  - Building name: `text-lg font-black uppercase` (most prominent)
-  - Floor: `text-sm font-semibold` below building
-  - Poopability + Cleanliness scores with colored icons
+- **Layout:** Building directory grid, max-width 1024px (`max-w-5xl`), responsive 2-column cards.
+- **Stats row:** Buildings count, Restrooms count, Red Alerts count.
+- **Search:** Filters by building name, floor label, or restroom name/description.
+- **Red Alert section:** Buildings with any red-alert restrooms.
+- **Normal section:** All other buildings, sorted by weighted average rating desc.
+- **Building Card design:**
+  - Building name: `text-2xl font-black tracking-tight` (most prominent)
+  - Floor count + floor tags (chips)
+  - Poopability + Cleanliness scores (weighted by review count)
   - Total rating: large number on the right
+- **Add Restroom form:** Toggleable form at top. Fields: Building name (req), Floor (req), Name (opt), Description (opt).
+
+### BuildingDetail (`/building/:buildingName`)
+- **Header card:** Building name, floor count, restroom count, weighted average rating.
+- **Summary grid:** Poopability, Cleanliness, Red Alerts, Reset Timer.
+- **Floor cards:** Sorted by floor (B1, G, 1F, 2F...), each with scores and a "View details" link.
+- **Red alert styling:** Red bg/border for flagged restrooms.
 
 ### RestroomDetail (`/restroom/:id`)
 - Header card with building name, floor, average rating.
@@ -187,7 +206,7 @@ export PATH="$HOME/.nvm/versions/node/v20.20.2/bin:$PATH"
 npm run dev           # runs on :5173, proxies /api and /socket.io to :5001
 ```
 
-No MongoDB required for local dev — in-memory mode activates automatically.
+No MongoDB required for local dev — SQLite activates automatically and persists data to `server/data/database.sqlite`.
 
 > **Important:** The frontend needs the backend running to display restroom data. If you only see the header/search bar but no cards, the backend is not started.
 
@@ -198,8 +217,9 @@ No MongoDB required for local dev — in-memory mode activates automatically.
 Create `server/.env`:
 ```env
 PORT=5001
-MONGODB_URI=mongodb+srv://...   # optional; omit for memory mode
+MONGODB_URI=mongodb+srv://...   # optional; omit for SQLite fallback
 CLIENT_URL=http://localhost:5173
+SQLITE_PATH=./data/database.sqlite   # optional; defaults to server/data/database.sqlite
 ```
 
 **Client-side (optional):**
@@ -222,7 +242,8 @@ CLIENT_URL=http://localhost:5173
 | Reset time | `server/server.js` — change `setHours(6, 0, 0, 0)` and cron pattern |
 | Seed restrooms / buildings | `server/data/uncRestrooms.js` |
 | Red alert threshold | `server/data/memoryStore.js` — `redAlertCount >= 2` |
-| Score formulas | `server/data/memoryStore.js` — `pooperScore` / `cleanliness` lines |
+| Score formulas | `server/data/memoryStore.js` or `sqliteStore.js` — `pooperScore` / `cleanliness` lines |
+| SQLite schema / local DB | `server/config/sqlite.js` — table definitions |
 | Card UI layout | `client/src/pages/HomePage.jsx` — `RestroomRow` component |
 | Rating UI | `client/src/pages/RestroomDetail.jsx` — star buttons section |
 | API base URL / proxy rules | `client/vite.config.js` — `server.proxy` section |

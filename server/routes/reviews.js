@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { isDBConnected } = require('../config/db');
+const { isDBConnected, isSQLiteConnected } = require('../config/db');
 const memoryStore = require('../data/memoryStore');
+const sqliteStore = require('../data/sqliteStore');
 
 let Restroom;
 try { Restroom = require('../models/Restroom'); } catch (e) { Restroom = null; }
-const useMemory = () => !isDBConnected() || !Restroom;
+
+const useMemory = () => !isDBConnected() && !isSQLiteConnected();
+const useSQLite = () => !isDBConnected() && isSQLiteConnected();
 
 // POST star rating (1-5)
 router.post('/rate/:restroomId', async (req, res) => {
@@ -17,6 +20,13 @@ router.post('/rate/:restroomId', async (req, res) => {
 
     if (useMemory()) {
       const result = memoryStore.submitRating(req.params.restroomId, rating);
+      if (!result) return res.status(404).json({ message: 'Restroom not found' });
+      req.io.emit('ratingUpdate', { restroom: result.restroom });
+      return res.status(201).json(result);
+    }
+
+    if (useSQLite()) {
+      const result = await sqliteStore.submitRating(req.params.restroomId, rating);
       if (!result) return res.status(404).json({ message: 'Restroom not found' });
       req.io.emit('ratingUpdate', { restroom: result.restroom });
       return res.status(201).json(result);
@@ -54,6 +64,13 @@ router.post('/noflush/:restroomId', async (req, res) => {
       const restroom = memoryStore.getRestroomById(req.params.restroomId);
       req.io.emit('ratingUpdate', { restroom });
       return res.status(201).json({ alert, restroom });
+    }
+
+    if (useSQLite()) {
+      const result = await sqliteStore.triggerNoFlushAlert(req.params.restroomId);
+      if (!result) return res.status(404).json({ message: 'Restroom not found' });
+      req.io.emit('ratingUpdate', { restroom: result.restroom });
+      return res.status(201).json({ alert: result.alert, restroom: result.restroom });
     }
 
     const restroom = await Restroom.findById(req.params.restroomId);
