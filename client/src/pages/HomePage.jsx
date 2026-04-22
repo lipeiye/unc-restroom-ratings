@@ -1,25 +1,45 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, AlertTriangle, Clock, Droplets, Sparkles, Plus, X } from 'lucide-react'
+import {
+  Search,
+  AlertTriangle,
+  Clock,
+  Droplets,
+  Sparkles,
+  Plus,
+  X,
+  Building2,
+  ChevronRight,
+} from 'lucide-react'
 import { useRestrooms } from '../hooks/useRestrooms'
+import { buildBuildingPath, groupRestroomsByBuilding } from '../utils/buildings'
 
 function HomePage() {
   const { restrooms, loading, countdown, createRestroom } = useRestrooms()
   const [search, setSearch] = useState('')
-  const [filterBuilding, setFilterBuilding] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [newRestroom, setNewRestroom] = useState({ name: '', building: '', floor: '', description: '' })
 
-  const buildings = [...new Set(restrooms.map(r => r.building))].sort()
+  const buildings = groupRestroomsByBuilding(restrooms)
+  const normalizedSearch = search.trim().toLowerCase()
 
-  const filtered = restrooms.filter(r => {
-    if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.building.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterBuilding && r.building !== filterBuilding) return false
-    return true
+  const filteredBuildings = buildings.filter(building => {
+    if (!normalizedSearch) {
+      return true
+    }
+
+    return (
+      building.name.toLowerCase().includes(normalizedSearch) ||
+      building.floors.some(floor => floor.toLowerCase().includes(normalizedSearch)) ||
+      building.restrooms.some(restroom =>
+        restroom.name.toLowerCase().includes(normalizedSearch) ||
+        (restroom.description || '').toLowerCase().includes(normalizedSearch)
+      )
+    )
   })
 
-  const redAlerts = filtered.filter(r => r.redAlert)
-  const normal = filtered.filter(r => !r.redAlert)
+  const redAlerts = filteredBuildings.filter(building => building.hasRedAlert)
+  const normalBuildings = filteredBuildings.filter(building => !building.hasRedAlert)
 
   const handleAddRestroom = async (e) => {
     e.preventDefault()
@@ -38,43 +58,54 @@ function HomePage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="mb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">UNC Restrooms</h1>
-            <p className="text-sm text-gray-400">Real-time ratings · Resets daily at 6AM</p>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-sky-600 mb-2">Building Directory</p>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">Browse restroom info building by building</h1>
+            <p className="text-sm text-gray-500 mt-2">
+              Each card is a UNC building. Open one to see the floors, scores, and flagged restrooms inside.
+            </p>
           </div>
-          <div className="flex items-center space-x-2 bg-red-50 text-red-700 px-3 py-2 rounded-xl text-xs font-bold">
+          <div className="flex items-center space-x-2 bg-red-50 text-red-700 px-3 py-2 rounded-xl text-xs font-bold w-fit">
             <Clock size={14} />
             <span>{countdown}</span>
           </div>
         </div>
 
-        {/* Search & Filter */}
+        <div className="grid gap-3 sm:grid-cols-3 mb-4">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Buildings</div>
+            <div className="text-3xl font-black text-gray-900">{filteredBuildings.length}</div>
+          </div>
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Restrooms</div>
+            <div className="text-3xl font-black text-gray-900">
+              {filteredBuildings.reduce((sum, building) => sum + building.restroomCount, 0)}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-white border border-gray-100 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Red Alerts</div>
+            <div className="text-3xl font-black text-red-600">
+              {filteredBuildings.reduce((sum, building) => sum + building.redAlertCount, 0)}
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-3 mb-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="Search building or floor..."
+              placeholder="Search a building, floor, or restroom name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none text-sm"
             />
           </div>
-          <select
-            value={filterBuilding}
-            onChange={(e) => setFilterBuilding(e.target.value)}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
-          >
-            <option value="">All Buildings</option>
-            {buildings.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
         </div>
 
-        {/* Add Restroom Button */}
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className="flex items-center space-x-2 text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
@@ -84,7 +115,6 @@ function HomePage() {
         </button>
       </div>
 
-      {/* Add Restroom Form */}
       {showAddForm && (
         <form onSubmit={handleAddRestroom} className="bg-white rounded-xl border border-gray-100 p-5 mb-6 space-y-3">
           <h3 className="font-bold text-gray-900">Add New Restroom</h3>
@@ -129,33 +159,39 @@ function HomePage() {
         </form>
       )}
 
-      {/* Red Alert Section */}
       {redAlerts.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-8">
           <div className="flex items-center space-x-2 mb-3">
             <AlertTriangle className="text-red-500" size={18} />
-            <h2 className="font-bold text-red-600">RED ALERT ({redAlerts.length})</h2>
+            <h2 className="font-bold text-red-600">Buildings With Red Alerts ({redAlerts.length})</h2>
           </div>
-          <div className="space-y-2">
-            {redAlerts.map(r => <RestroomRow key={r._id} restroom={r} />)}
+          <div className="grid gap-4 md:grid-cols-2">
+            {redAlerts.map(building => <BuildingCard key={building.name} building={building} />)}
           </div>
         </div>
       )}
 
-      {/* Normal Section */}
       <div>
         <h2 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">
-          All Restrooms ({normal.length})
+          All Buildings ({normalBuildings.length})
         </h2>
-        <div className="space-y-2">
-          {normal.map(r => <RestroomRow key={r._id} restroom={r} />)}
-        </div>
+        {normalBuildings.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {normalBuildings.map(building => <BuildingCard key={building.name} building={building} />)}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-12 text-center">
+            <Building2 className="mx-auto text-gray-300 mb-3" size={28} />
+            <h3 className="text-lg font-bold text-gray-900 mb-1">No buildings match this search</h3>
+            <p className="text-sm text-gray-500">Try another building name, floor label, or restroom keyword.</p>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function RestroomRow({ restroom }) {
+function BuildingCard({ building }) {
   const scoreColor = (score) => {
     if (score >= 4) return 'text-green-600'
     if (score >= 3) return 'text-yellow-600'
@@ -165,55 +201,70 @@ function RestroomRow({ restroom }) {
 
   return (
     <Link
-      to={`/restroom/${restroom._id}`}
-      className={`block rounded-xl p-4 border transition-all hover:shadow-md ${
-        restroom.redAlert
+      to={buildBuildingPath(building.name)}
+      className={`group block rounded-2xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+        building.hasRedAlert
           ? 'bg-red-50 border-red-200'
           : 'bg-white border-gray-100'
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          {/* BUILDING NAME — MOST PROMINENT */}
-          <div className="flex items-center space-x-2 mb-0.5">
-            {restroom.redAlert && <span className="text-base">🚨</span>}
-            <h3 className={`text-lg font-black tracking-tight uppercase truncate ${restroom.redAlert ? 'text-red-700' : 'text-gray-900'}`}>
-              {restroom.building}
-            </h3>
+          <div className="flex items-center space-x-2 mb-2">
+            {building.hasRedAlert && <span className="text-base">🚨</span>}
+            <span className={`text-xs font-bold uppercase tracking-[0.24em] ${building.hasRedAlert ? 'text-red-500' : 'text-sky-600'}`}>
+              {building.floorCount} floors
+            </span>
           </div>
-          {/* Floor — secondary */}
-          <p className={`text-sm font-semibold ${restroom.redAlert ? 'text-red-500' : 'text-gray-500'}`}>
-            {restroom.name} · {restroom.floor}
+          <h3 className={`text-2xl font-black tracking-tight ${building.hasRedAlert ? 'text-red-700' : 'text-gray-900'}`}>
+            {building.name}
+          </h3>
+          <p className={`text-sm font-medium mt-1 ${building.hasRedAlert ? 'text-red-500' : 'text-gray-500'}`}>
+            {building.restroomCount} restroom entries · {building.totalReviews} total ratings
           </p>
 
-          {/* Scores row */}
-          <div className="flex items-center space-x-4 mt-2">
+          <div className="flex flex-wrap gap-2 mt-4">
+            {building.floors.map(floor => (
+              <span
+                key={`${building.name}-${floor}`}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  building.hasRedAlert ? 'bg-white text-red-600 border border-red-100' : 'bg-sky-50 text-sky-700'
+                }`}
+              >
+                {floor}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4">
             <div className="flex items-center space-x-1">
-              <Droplets size={12} className={scoreColor(restroom.pooperScore)} />
-              <span className={`text-xs font-bold ${scoreColor(restroom.pooperScore)}`}>
-                {restroom.pooperScore > 0 ? restroom.pooperScore.toFixed(1) : '—'}
+              <Droplets size={12} className={scoreColor(building.pooperScore)} />
+              <span className={`text-xs font-bold ${scoreColor(building.pooperScore)}`}>
+                {building.pooperScore > 0 ? building.pooperScore.toFixed(1) : '—'}
               </span>
               <span className="text-[10px] text-gray-300 font-medium">Poopability</span>
             </div>
             <div className="flex items-center space-x-1">
-              <Sparkles size={12} className={scoreColor(restroom.cleanliness)} />
-              <span className={`text-xs font-bold ${scoreColor(restroom.cleanliness)}`}>
-                {restroom.cleanliness > 0 ? restroom.cleanliness.toFixed(1) : '—'}
+              <Sparkles size={12} className={scoreColor(building.cleanliness)} />
+              <span className={`text-xs font-bold ${scoreColor(building.cleanliness)}`}>
+                {building.cleanliness > 0 ? building.cleanliness.toFixed(1) : '—'}
               </span>
               <span className="text-[10px] text-gray-300 font-medium">Clean</span>
             </div>
-            {restroom.noFlushCount > 0 && (
-              <span className="text-xs text-red-500 font-bold">🚫 {restroom.noFlushCount}</span>
+            {building.noFlushCount > 0 && (
+              <span className="text-xs text-red-500 font-bold">🚫 {building.noFlushCount} no-flush reports</span>
             )}
           </div>
         </div>
 
-        {/* Rating — right side, large */}
-        <div className="text-right ml-4 flex flex-col items-end justify-center">
-          <div className={`text-3xl font-black leading-none ${restroom.redAlert ? 'text-red-600' : 'text-gray-900'}`}>
-            {restroom.averageRating > 0 ? restroom.averageRating.toFixed(1) : '—'}
+        <div className="text-right ml-4 flex flex-col items-end justify-between self-stretch">
+          <ChevronRight className={`transition-transform group-hover:translate-x-1 ${building.hasRedAlert ? 'text-red-400' : 'text-gray-300'}`} size={20} />
+          <div>
+            <div className={`text-4xl font-black leading-none ${building.hasRedAlert ? 'text-red-600' : 'text-gray-900'}`}>
+              {building.averageRating > 0 ? building.averageRating.toFixed(1) : '—'}
+            </div>
+            <div className="text-[10px] text-gray-400 font-medium mt-1">building score</div>
           </div>
-          <div className="text-[10px] text-gray-400 font-medium mt-1">{restroom.totalReviews} ratings</div>
         </div>
       </div>
     </Link>

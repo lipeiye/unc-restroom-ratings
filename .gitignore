@@ -35,3 +35,8 @@ coverage/
 # Misc
 .cache/
 *.pem
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db

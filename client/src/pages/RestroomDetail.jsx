@@ -1,11 +1,20 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, Clock } from 'lucide-react'
 import { useRestrooms } from '../hooks/useRestrooms'
+import { buildBuildingPath } from '../utils/buildings'
 
 function RestroomDetail() {
   const { id } = useParams()
-  const { restrooms, countdown, submitRating, submitNoFlush } = useRestrooms()
+  const { restrooms, countdown, loading, submitRating, submitNoFlush } = useRestrooms()
   const restroom = restrooms.find(r => r._id === id)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
+      </div>
+    )
+  }
 
   if (!restroom) {
     return (
@@ -49,9 +58,9 @@ function RestroomDetail() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <Link to="/" className="inline-flex items-center space-x-2 text-gray-500 hover:text-red-500 transition-colors mb-6 text-sm">
+      <Link to={buildBuildingPath(restroom.building)} className="inline-flex items-center space-x-2 text-gray-500 hover:text-red-500 transition-colors mb-6 text-sm">
         <ArrowLeft size={16} />
-        <span>Back to list</span>
+        <span>Back to building</span>
       </Link>
 
       {/* Header */}
