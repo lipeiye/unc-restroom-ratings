@@ -164,7 +164,7 @@ function RestroomDetail() {
           <span>Daily Reset</span>
         </div>
         <p className="text-xs text-gray-400">
-          All ratings reset at 8:00 PM · Next reset in <span className="font-mono font-bold text-gray-600">{countdown}</span>
+          All ratings reset at 6:00 AM · Next reset in <span className="font-mono font-bold text-gray-600">{countdown}</span>
         </p>
       </div>
     </div>

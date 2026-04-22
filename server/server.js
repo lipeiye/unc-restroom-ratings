@@ -29,11 +29,11 @@ app.use((req, res, next) => {
 app.use('/api/restrooms', restroomRoutes);
 app.use('/api/reviews', reviewRoutes);
 
-// Daily reset at 8:00 PM
+// Daily reset at 6:00 AM
 function scheduleReset() {
   const now = new Date();
   const resetTime = new Date();
-  resetTime.setHours(20, 0, 0, 0);
+  resetTime.setHours(6, 0, 0, 0);
   if (resetTime <= now) resetTime.setDate(resetTime.getDate() + 1);
 
   const msUntilReset = resetTime - now;
@@ -44,14 +44,14 @@ function scheduleReset() {
     memoryStore.resetAllData();
     io.emit('dataReset', { resetAt: new Date().toISOString() });
     console.log('✅ Daily reset complete');
-    scheduleReset(); // Schedule next
+    scheduleReset();
   }, msUntilReset);
 }
 
 scheduleReset();
 
 // Also support cron for robustness
-cron.schedule('0 20 * * *', () => {
+cron.schedule('0 6 * * *', () => {
   console.log('🔄 Cron triggered daily reset');
   memoryStore.resetAllData();
   io.emit('dataReset', { resetAt: new Date().toISOString() });
@@ -70,5 +70,5 @@ if (process.env.NODE_ENV === 'production') {
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📅 Daily reset at 8:00 PM`);
+  console.log(`📅 Daily reset at 6:00 AM`);
 });

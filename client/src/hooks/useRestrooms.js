@@ -45,12 +45,12 @@ export function useRestrooms() {
     return res.data
   }, [])
 
-  // Countdown to 8 PM
+  // Countdown to 6 AM
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date()
       const reset = new Date()
-      reset.setHours(20, 0, 0, 0)
+      reset.setHours(6, 0, 0, 0)
       if (reset <= now) reset.setDate(reset.getDate() + 1)
       const diff = reset - now
       const h = Math.floor(diff / 3600000)

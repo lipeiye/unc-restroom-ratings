@@ -44,7 +44,7 @@ function HomePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">UNC Restrooms</h1>
-            <p className="text-sm text-gray-400">Real-time ratings · Resets daily at 8PM</p>
+            <p className="text-sm text-gray-400">Real-time ratings · Resets daily at 6AM</p>
           </div>
           <div className="flex items-center space-x-2 bg-red-50 text-red-700 px-3 py-2 rounded-xl text-xs font-bold">
             <Clock size={14} />
@@ -174,28 +174,33 @@ function RestroomRow({ restroom }) {
     >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            {restroom.redAlert && <span className="text-sm">🚨</span>}
-            <h3 className={`font-bold text-sm truncate ${restroom.redAlert ? 'text-red-700' : 'text-gray-900'}`}>
-              {restroom.name}
+          {/* BUILDING NAME — MOST PROMINENT */}
+          <div className="flex items-center space-x-2 mb-0.5">
+            {restroom.redAlert && <span className="text-base">🚨</span>}
+            <h3 className={`text-lg font-black tracking-tight uppercase truncate ${restroom.redAlert ? 'text-red-700' : 'text-gray-900'}`}>
+              {restroom.building}
             </h3>
           </div>
-          <p className="text-xs text-gray-400">{restroom.building} · {restroom.floor}</p>
+          {/* Floor — secondary */}
+          <p className={`text-sm font-semibold ${restroom.redAlert ? 'text-red-500' : 'text-gray-500'}`}>
+            {restroom.name} · {restroom.floor}
+          </p>
 
-          <div className="flex items-center space-x-3 mt-2">
+          {/* Scores row */}
+          <div className="flex items-center space-x-4 mt-2">
             <div className="flex items-center space-x-1">
               <Droplets size={12} className={scoreColor(restroom.pooperScore)} />
               <span className={`text-xs font-bold ${scoreColor(restroom.pooperScore)}`}>
                 {restroom.pooperScore > 0 ? restroom.pooperScore.toFixed(1) : '—'}
               </span>
-              <span className="text-[10px] text-gray-300">Poopability</span>
+              <span className="text-[10px] text-gray-300 font-medium">Poopability</span>
             </div>
             <div className="flex items-center space-x-1">
               <Sparkles size={12} className={scoreColor(restroom.cleanliness)} />
               <span className={`text-xs font-bold ${scoreColor(restroom.cleanliness)}`}>
                 {restroom.cleanliness > 0 ? restroom.cleanliness.toFixed(1) : '—'}
               </span>
-              <span className="text-[10px] text-gray-300">Clean</span>
+              <span className="text-[10px] text-gray-300 font-medium">Clean</span>
             </div>
             {restroom.noFlushCount > 0 && (
               <span className="text-xs text-red-500 font-bold">🚫 {restroom.noFlushCount}</span>
@@ -203,11 +208,12 @@ function RestroomRow({ restroom }) {
           </div>
         </div>
 
-        <div className="text-right ml-4">
-          <div className={`text-2xl font-black ${restroom.redAlert ? 'text-red-600' : 'text-gray-900'}`}>
+        {/* Rating — right side, large */}
+        <div className="text-right ml-4 flex flex-col items-end justify-center">
+          <div className={`text-3xl font-black leading-none ${restroom.redAlert ? 'text-red-600' : 'text-gray-900'}`}>
             {restroom.averageRating > 0 ? restroom.averageRating.toFixed(1) : '—'}
           </div>
-          <div className="text-[10px] text-gray-400">{restroom.totalReviews} ratings</div>
+          <div className="text-[10px] text-gray-400 font-medium mt-1">{restroom.totalReviews} ratings</div>
         </div>
       </div>
     </Link>

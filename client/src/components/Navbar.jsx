@@ -19,7 +19,7 @@ function Navbar() {
             </div>
             <div className="flex items-center space-x-1">
               <Clock size={12} />
-              <span>Resets 8PM Daily</span>
+              <span>Resets 6AM Daily</span>
             </div>
           </div>
         </div>
